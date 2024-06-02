@@ -7,7 +7,7 @@ from langchain.embeddings import OpenAIEmbeddings
 import os
 import io
 import tempfile
-import whisper
+import whisper  # Updated import
 from gtts import gTTS
 import numpy as np
 import requests
