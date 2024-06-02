@@ -6,26 +6,32 @@ from langchain_experimental.agents import create_pandas_dataframe_agent
 from langchain.embeddings import OpenAIEmbeddings
 import os
 import io
-import whisper
+from langchain.llms import whisper
 import tempfile
+import whisper
 from gtts import gTTS
 import numpy as np
 import requests
 import json
 import speech_recognition as sr
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Get API keys from environment variables
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+ELEVEN_LABS_API_KEY = os.getenv("ELEVEN_LABS_API_KEY")
+DEFAULT_VOICE = os.getenv("DEFAULT_VOICE")
 
 # Initialize the OpenAI object
-llm = OpenAI(api_key="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")  # Your OpenAI API key
+llm = OpenAI(api_key=OPENAI_API_KEY)
 
 # Initialize the OpenAI Embeddings object
-embedding_model = OpenAIEmbeddings(api_key="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")  # Your OpenAI API key
+embedding_model = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
 
 # Initialize Whisper model
 model = whisper.load_model("base")
-
-# Eleven Labs API settings
-ELEVEN_LABS_API_KEY = "522507bded6d1513afc3fc9c3437a4f4"  # Replace with your actual API key
-DEFAULT_VOICE = "21m00Tcm4TlvDq8ikWAM"  # rachel voice ID
 
 def create_agent(data, llm):
     """Create a Pandas DataFrame agent."""
@@ -57,55 +63,54 @@ def process_file(uploaded_file):
 def record_audio():
     recognizer = sr.Recognizer()
     with sr.Microphone() as source:
-        st.info("Recording...")
-        audio_data = recognizer.listen(source, timeout=8, phrase_time_limit=8)
-        try:
-            text = recognizer.recognize_google(audio_data)
-            return text
-        except sr.UnknownValueError:
-            st.warning("Sorry, I could not understand the audio.")
-            return None
-        except sr.RequestError:
-            st.warning("Could not request results; check your network connection.")
-            return None
+        st.write("Say something!")
+        audio = recognizer.listen(source)
+    try:
+        text = recognizer.recognize_google(audio)
+        st.write(f"You said: {text}")
+        return text
+    except sr.UnknownValueError:
+        st.write("Google Speech Recognition could not understand audio")
+        return None
+    except sr.RequestError as e:
+        st.write(f"Could not request results from Google Speech Recognition service; {e}")
+        return None
+
+def text_to_speech(text, voice_id=DEFAULT_VOICE):
+    url = "https://api.elevenlabs.io/v1/text-to-speech"
+    headers = {
+        "xi-api-key": ELEVEN_LABS_API_KEY,
+        "Content-Type": "application/json"
+    }
+    data = {
+        "text": text,
+        "voice_id": voice_id
+    }
+    response = requests.post(url, headers=headers, json=data)
+    if response.status_code == 200:
+        audio_content = response.content
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
+            f.write(audio_content)
+            return f.name
+    else:
+        st.write("Error: ", response.status_code, response.text)
+        return None
 
 def get_eleven_labs_voices():
     url = "https://api.elevenlabs.io/v1/voices"
     headers = {
         "xi-api-key": ELEVEN_LABS_API_KEY,
+        "Content-Type": "application/json"
     }
     response = requests.get(url, headers=headers)
     if response.status_code == 200:
         return response.json()["voices"]
     else:
+        st.write("Error fetching voices: ", response.status_code, response.text)
         return None
 
-def text_to_speech(text, voice_id=DEFAULT_VOICE):
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-    headers = {
-        "xi-api-key": ELEVEN_LABS_API_KEY,
-        "Content-Type": "application/json",
-    }
-    data = {
-        "text": text,
-        "voice_settings": {
-            "stability": 0.5,
-            "similarity_boost": 0.5
-        }
-    }
-    response = requests.post(url, headers=headers, data=json.dumps(data))
-    if response.status_code == 200:
-        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as temp_audio:
-            temp_audio.write(response.content)
-            return temp_audio.name
-    else:
-        return None
-
-# Streamlit app layout
-st.set_page_config(page_title="Voice Conversation with Data", layout="wide")
-
-# Sidebar for file upload and voice selection
-st.sidebar.title("Upload File & Settings")
+# Streamlit app interface
+st.sidebar.title("Upload your file")
 uploaded_file = st.sidebar.file_uploader("Choose a CSV or PDF file", type=["csv", "pdf"])
 if uploaded_file:
     process_file(uploaded_file)
