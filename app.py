@@ -29,7 +29,7 @@ llm = OpenAI(api_key=OPENAI_API_KEY)
 embedding_model = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
 
 # Initialize Whisper model
-model = whisper.load_model("base")
+model = whisper.load_model("tiny")
 
 def create_agent(data, llm):
     """Create a Pandas DataFrame agent."""
