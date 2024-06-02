@@ -6,7 +6,7 @@ from langchain_experimental.agents import create_pandas_dataframe_agent
 from langchain.embeddings import OpenAIEmbeddings
 import os
 import io
-from langchain.models import whisper
+from langchain.llms import whisper
 import tempfile
 from gtts import gTTS
 import numpy as np
